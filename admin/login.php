@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="login-card">
             <div class="logo">☕</div>
 
-            <h1>Café Order</h1>
+            <h1>Cafe Order</h1>
             <p class="subtitle">Login Admin & Kasir</p>
 
             <?php if ($error): ?>
@@ -207,13 +207,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <button type="submit">Login</button>
             </form>
-
-            <div class="info">
-                <strong>Demo Login</strong><br>
-                Admin: admin / password<br>
-                Kasir: kasir / password
-            </div>
-
             <a href="../index.php" class="back">← Kembali ke halaman utama</a>
         </div>
     </div>

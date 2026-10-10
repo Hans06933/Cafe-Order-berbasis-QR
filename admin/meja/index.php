@@ -12,8 +12,15 @@ $page_title = "Kelola Meja";
 require_once "../../includes/header.php";
 require_once "../../includes/navbar.php";
 
-// Fetch data meja
-$stmt = $pdo->query("SELECT * FROM tables ORDER BY id DESC");
+// Fetch data meja sekaligus hitung jumlah pesanan aktif (pending, diproses, siap)
+$query = "SELECT t.*, 
+            COUNT(CASE WHEN LOWER(o.status) IN ('pending', 'diproses', 'siap') THEN 1 END) AS active_orders
+          FROM tables t
+          LEFT JOIN orders o ON t.id = o.table_id
+          GROUP BY t.id
+          ORDER BY t.id DESC";
+
+$stmt = $pdo->query($query);
 $meja_list = $stmt->fetchAll();
 ?>
 
@@ -60,11 +67,25 @@ $meja_list = $stmt->fetchAll();
                             <?php else: ?>
                                 <?php foreach ($meja_list as $meja): ?>
                                     <?php 
-                                        // Menggunakan DEV_TUNNEL_URL agar QR Code selalu mengarah ke HP/Internet
+                                        // Target URL QR Code
                                         $target_url = defined('DEV_TUNNEL_URL') ? DEV_TUNNEL_URL : BASE_URL;
                                         $base_url_fixed = rtrim($target_url, '/') . '/';
                                         $orderUrl = $base_url_fixed . "index.php?meja=" . urlencode($meja['kode_meja']);
                                         $qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($orderUrl);
+
+                                        // LOGIKA DETEKSI STATUS MEJA DARI PESANAN
+                                        $is_active = (int) ($meja['active_orders'] ?? 0) > 0;
+                                        
+                                        if ($meja['status'] === 'nonaktif') {
+                                            $displayStatus = 'Nonaktif';
+                                            $statusClass = 'badge-danger';
+                                        } elseif ($is_active) {
+                                            $displayStatus = 'Digunakan (' . $meja['active_orders'] . ' pesanan)';
+                                            $statusClass = 'badge-warning';
+                                        } else {
+                                            $displayStatus = 'Tersedia';
+                                            $statusClass = 'badge-success';
+                                        }
                                     ?>
                                     <tr>
                                         <td>
@@ -73,17 +94,7 @@ $meja_list = $stmt->fetchAll();
                                         <td><strong><?= htmlspecialchars($meja['nomor_meja']) ?></strong></td>
                                         <td><code><?= htmlspecialchars($meja['kode_meja']) ?></code></td>
                                         <td>
-                                            <?php
-                                            $statusClass = 'badge-info';
-                                            if ($meja['status'] === 'tersedia') {
-                                                $statusClass = 'badge-success';
-                                            } elseif ($meja['status'] === 'digunakan') {
-                                                $statusClass = 'badge-warning';
-                                            } elseif ($meja['status'] === 'nonaktif') {
-                                                $statusClass = 'badge-danger';
-                                            }
-                                            ?>
-                                            <span class="badge <?= $statusClass ?>"><?= htmlspecialchars(ucfirst($meja['status'])) ?></span>
+                                            <span class="badge <?= $statusClass ?>"><?= htmlspecialchars($displayStatus) ?></span>
                                         </td>
                                         <td>
                                             <div style="display: flex; gap: 7px;">

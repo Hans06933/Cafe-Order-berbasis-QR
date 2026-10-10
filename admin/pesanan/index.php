@@ -14,36 +14,28 @@ require_once "../../config/config.php";
 // ==========================================
 // HANDLE UPDATE STATUS PESANAN & PEMBAYARAN
 // ==========================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'])) {
-    $order_id = filter_input(INPUT_POST, 'order_id', FILTER_VALIDATE_INT);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'])) {$order_id = filter_input(INPUT_POST, 'order_id', FILTER_VALIDATE_INT);
 
     if ($order_id) {
         try {
             // Update Status Pesanan
-            if (isset($_POST['update_status'])) {
-                $status = strtolower(trim($_POST['status'] ?? ''));
-                $allowed_status = ['pending', 'diproses', 'siap', 'selesai', 'batal', 'dibatalkan'];
+            if (isset($_POST['update_status'])) {$status = strtolower(trim($_POST['status'] ?? ''));$allowed_status = ['pending', 'diproses', 'siap', 'selesai', 'batal', 'dibatalkan'];
                 
-                if (in_array($status, $allowed_status)) {
-                    $stmt = $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
-                    $stmt->execute([$status, $order_id]);
-                    $_SESSION['flash_success'] = "Status pesanan #" . $order_id . " berhasil diperbarui!";
+                if (in_array($status,$allowed_status)) {
+                    $stmt =$pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
+                    $stmt->execute([$status, $order_id]);$_SESSION['flash_success'] = "Status pesanan #" . $order_id . " berhasil diperbarui!";
                 }
             }
 
             // Update Status Pembayaran
-            if (isset($_POST['update_pembayaran'])) {
-                $status_pembayaran = strtolower(trim($_POST['status_pembayaran'] ?? ''));
-                $allowed_pembayaran = ['pending', 'lunas', 'batal', 'failed', 'success'];
+            if (isset($_POST['update_pembayaran'])) {$status_pembayaran = strtolower(trim($_POST['status_pembayaran'] ?? ''));$allowed_pembayaran = ['pending', 'lunas', 'batal', 'failed', 'success'];
 
-                if (in_array($status_pembayaran, $allowed_pembayaran)) {
-                    $stmt = $pdo->prepare("UPDATE orders SET status_pembayaran = ? WHERE id = ?");
-                    $stmt->execute([$status_pembayaran, $order_id]);
-                    $_SESSION['flash_success'] = "Status pembayaran pesanan #" . $order_id . " berhasil diperbarui!";
+                if (in_array($status_pembayaran,$allowed_pembayaran)) {
+                    $stmt =$pdo->prepare("UPDATE orders SET status_pembayaran = ? WHERE id = ?");
+                    $stmt->execute([$status_pembayaran, $order_id]);$_SESSION['flash_success'] = "Status pembayaran pesanan #" . $order_id . " berhasil diperbarui!";
                 }
             }
-        } catch (PDOException $e) {
-            $_SESSION['flash_error'] = "Error Database: " . $e->getMessage();
+        } catch (PDOException $e) {$_SESSION['flash_error'] = "Error Database: " . $e->getMessage();
         }
     }
 
@@ -61,9 +53,11 @@ try {
               GROUP BY o.id
               ORDER BY o.id DESC";
     $stmt = $pdo->query($query);
-    $orders = $stmt->fetchAll();
-} catch (PDOException $e) {
-    $orders = [];
+    $orders =$stmt->fetchAll();
+    
+    // Simpan ID pesanan paling baru untuk dijadikan patokan AJAX
+    $latest_order_id = !empty($orders) ? $orders[0]['id'] : 0; } catch (PDOException$e) {
+    $orders = [];$latest_order_id = 0;
     $error = "Gagal memuat data: " . $e->getMessage();
 }
 
@@ -72,7 +66,39 @@ require_once "../../includes/header.php";
 require_once "../../includes/navbar.php";
 ?>
 
-<!-- KUNCI UTAMA: Wajib dibungkus dengan class .main-wrapper agar tidak tertutup sidebar -->
+<style>
+/* Toast Notification Style */
+.order-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #10b981;
+    color: white;
+    padding: 16px 20px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transform: translateX(120%);
+    transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.order-toast.show {
+    transform: translateX(0);
+}
+</style>
+
+<!-- POPUP NOTIFIKASI PESANAN BARU -->
+<div id="order-toast" class="order-toast">
+    <i class="fa-solid fa-bell fa-bounce" style="font-size: 22px;"></i>
+    <div>
+        <strong style="display: block; font-size: 14px;">🔔 Pesanan Baru Masuk!</strong>
+        <span id="toast-order-info" style="font-size: 12px; opacity: 0.9;">--</span>
+    </div>
+</div>
+
 <div class="main-wrapper">
     <div class="content">
         <!-- HEADER HALAMAN -->
@@ -133,7 +159,7 @@ require_once "../../includes/navbar.php";
                                     </td>
                                 </tr>
                             <?php else: ?>
-                                <?php foreach ($orders as $order): ?>
+                                <?php foreach ($orders as$order): ?>
                                     <tr>
                                         <!-- PELANGGAN -->
                                         <td>
@@ -214,5 +240,79 @@ require_once "../../includes/navbar.php";
         </div>
     </div>
 </div>
+
+<script>
+let lastOrderId = <?= (int)$latest_order_id ?>;
+
+// Suara Notifikasi via Web Audio API (Tanpa perlu berkas MP3 eksternal)
+function playNotificationSound() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Nada 1
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        gain1.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start();
+        osc1.stop(audioCtx.currentTime + 0.3);
+
+        // Nada 2 (Lonceng)
+        setTimeout(() => {
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+            gain2.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.start();
+            osc2.stop(audioCtx.currentTime + 0.5);
+        }, 150);
+    } catch (e) {
+        console.log('Audio autoplay blocked or not supported');
+    }
+}
+
+// Tampilkan Toast Notifikasi
+function showOrderToast(nama, total) {
+    const toast = document.getElementById('order-toast');
+    const toastInfo = document.getElementById('toast-order-info');
+    toastInfo.innerText = `${nama} - Rp ${parseInt(total).toLocaleString('id-ID')}`;
+    
+    toast.classList.add('show');
+    playNotificationSound();
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 4000);
+}
+
+// Cek Pesanan Baru Setiap 5 Detik
+function checkNewOrders() {
+    fetch(`cek_pesanan_baru.php?last_id=${lastOrderId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'new_order' && data.order) {
+                lastOrderId = data.order.id;
+                showOrderToast(data.order.nama_pelanggan || 'Pelanggan', data.order.total || 0);
+                
+                // Refresh halaman otomatis setelah 1.5 detik agar pesanan muncul di tabel
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            }
+        })
+        .catch(err => console.error('Error checking orders:', err));
+}
+
+// Jalankan polling setiap 5000ms (5 detik)
+setInterval(checkNewOrders, 5000);
+</script>
 
 <?php require_once "../../includes/footer.php"; ?>

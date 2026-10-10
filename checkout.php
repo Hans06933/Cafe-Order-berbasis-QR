@@ -3,16 +3,16 @@ session_start();
 require_once "config/database.php";
 require_once "config/config.php";
 
-$kode_meja = $_SESSION['kode_meja'] ?? '';
+$kode_meja =$_SESSION['kode_meja'] ?? '';
 
 if (empty($kode_meja)) {
     header("Location: index.php");
     exit;
 }
 
-$stmt_meja = $pdo->prepare("SELECT * FROM tables WHERE kode_meja = ?");
+$stmt_meja =$pdo->prepare("SELECT * FROM tables WHERE kode_meja = ?");
 $stmt_meja->execute([$kode_meja]);
-$meja_info = $stmt_meja->fetch();
+$meja_info =$stmt_meja->fetch();
 
 if (!$meja_info) {
     header("Location: index.php");
@@ -94,7 +94,7 @@ if (!$meja_info) {
                 <input type="radio" name="metode_pembayaran" value="kasir" checked onclick="toggleQRIS(false)">
                 <div>
                     <strong style="font-size: 14px;"><i class="fa-solid fa-cash-register"></i> Bayar Langsung di Kasir</strong>
-                    <div style="font-size: 12px; color: #6b7280;">Bayar tunai atau EDC untuk proses peanana anda di kasir</div>
+                    <div style="font-size: 12px; color: #6b7280;">Bayar tunai atau EDC untuk proses pesanan anda di kasir</div>
                 </div>
             </label>
 
@@ -110,7 +110,6 @@ if (!$meja_info) {
             <div id="qris-box" style="display: none; text-align: center; margin-top: 15px; padding: 15px; background: #fff8f0; border: 1px dashed #8b5e3c; border-radius: 8px;">
                 <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #8b5e3c;">Scan QRIS di bawah ini untuk membayar:</p>
                 
-                <!-- Path diperbarui menggunakan BASE_URL -->
                 <img src="<?= BASE_URL ?>assets/images/qris.jpg" 
                     alt="QRIS Cafe" 
                     style="width: 200px; height: 200px; object-fit: contain; border-radius: 8px; border: 1px solid #ddd;" 
@@ -176,6 +175,9 @@ function changeQty(index, change) {
 document.getElementById('order-form').addEventListener('submit', function() {
     document.getElementById('btn-submit').disabled = true;
     document.getElementById('btn-submit').innerText = 'Memproses Pesanan...';
+    
+    // Hapus keranjang lokal setelah submit
+    localStorage.removeItem('cafe_cart');
 });
 
 renderCheckout();
